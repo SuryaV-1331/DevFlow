@@ -32,7 +32,9 @@ public class CustomUserDetailsService
                 .builder()
                 .username(user.getEmail())
                 .password(user.getPassword())
-                .authorities("ROLE_USER")
+                .authorities(
+                        "ROLE_" + user.getRole().getName()
+                )
                 .build();
     }
 }
