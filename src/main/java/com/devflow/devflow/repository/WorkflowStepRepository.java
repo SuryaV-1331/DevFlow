@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface WorkflowStepRepository
@@ -12,4 +13,9 @@ public interface WorkflowStepRepository
 
     List<WorkflowStep> findByWorkflowIdOrderByStepOrder(
             Long workflowId);
+
+    Optional<WorkflowStep> findByWorkflowIdAndStepOrder(
+            Long workflowId,
+            Integer stepOrder
+    );
 }

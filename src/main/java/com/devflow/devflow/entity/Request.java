@@ -1,5 +1,6 @@
 package com.devflow.devflow.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -17,11 +18,15 @@ public class Request {
 
     private String status;
 
+    private Integer currentStep;
+
     @ManyToOne
+    @JsonIgnore
     @JoinColumn(name = "workflow_id")
     private WorkflowMaster workflow;
 
     @ManyToOne
+    @JsonIgnore
     @JoinColumn(name = "created_by")
     private User createdBy;
 }
