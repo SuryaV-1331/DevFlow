@@ -1,8 +1,11 @@
 package com.devflow.devflow.entity;
 
+import com.devflow.devflow.enums.RequestStatus;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
+
+import java.time.LocalDateTime;
 
 
 @Entity
@@ -16,7 +19,8 @@ public class Request {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String status;
+    @Enumerated(EnumType.STRING)
+    private RequestStatus status;
 
     private Integer currentStep;
 
@@ -29,4 +33,8 @@ public class Request {
     @JsonIgnore
     @JoinColumn(name = "created_by")
     private User createdBy;
+
+    private LocalDateTime createdAt;
+
+    private LocalDateTime updatedAt;
 }

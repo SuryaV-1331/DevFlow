@@ -31,4 +31,14 @@ public class WorkflowStepController {
         return workflowStepService
                 .getSteps(workflowId);
     }
+
+    @GetMapping("/workflow/{workflowId}")
+    public List<WorkflowStep>
+    getWorkflowSteps(
+            @PathVariable Long workflowId) {
+
+        return workflowStepService
+                .getWorkflowSteps(
+                        workflowId);
+    }
 }

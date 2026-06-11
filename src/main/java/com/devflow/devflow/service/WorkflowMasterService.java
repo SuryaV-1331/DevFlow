@@ -5,6 +5,8 @@ import com.devflow.devflow.entity.WorkflowMaster;
 import com.devflow.devflow.repository.WorkflowMasterRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class WorkflowMasterService {
 
@@ -25,5 +27,20 @@ public class WorkflowMasterService {
         workflow.setWorkflowDescription(request.getWorkflowDescription());
 
         return workflowMasterRepository.save(workflow);
+    }
+
+    public List<WorkflowMaster> getAllWorkflows() {
+
+        return workflowMasterRepository.findAll();
+    }
+
+    public WorkflowMaster getWorkflowById(
+            Long workflowId) {
+
+        return workflowMasterRepository
+                .findById(workflowId)
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Workflow not found"));
     }
 }

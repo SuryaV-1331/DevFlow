@@ -56,4 +56,13 @@ public class WorkflowStepService {
                         workflowId);
     }
 
+    public List<WorkflowStep>
+    getWorkflowSteps(
+            Long workflowId) {
+
+        return workflowStepRepository
+                .findByWorkflowIdOrderByStepOrder(
+                        workflowId);
+    }
+
 }

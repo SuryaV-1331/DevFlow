@@ -1,15 +1,16 @@
 package com.devflow.devflow.service;
 
+import com.devflow.devflow.dto.ActionRequest;
+import com.devflow.devflow.dto.ApprovalHistoryResponse;
 import com.devflow.devflow.dto.RequestCreateRequest;
 import com.devflow.devflow.dto.RequestResponse;
 import com.devflow.devflow.entity.*;
-import com.devflow.devflow.repository.RequestRepository;
-import com.devflow.devflow.repository.UserRepository;
-import com.devflow.devflow.repository.WorkflowMasterRepository;
-import com.devflow.devflow.repository.WorkflowStepRepository;
+import com.devflow.devflow.enums.RequestStatus;
+import com.devflow.devflow.repository.*;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Optional;
 import java.util.List;
@@ -22,16 +23,18 @@ public class RequestService {
     private final UserRepository userRepository;
     private final WorkflowMasterRepository workflowMasterRepository;
     private final WorkflowStepRepository workflowStepRepository;
+    private final ApprovalHistoryRepository approvalHistoryRepository;
 
     public RequestService(
             RequestRepository requestRepository,
             UserRepository userRepository,
-            WorkflowMasterRepository workflowMasterRepository, WorkflowStepRepository workflowStepRepository) {
+            WorkflowMasterRepository workflowMasterRepository, WorkflowStepRepository workflowStepRepository, ApprovalHistoryRepository approvalHistoryRepository) {
 
         this.requestRepository = requestRepository;
         this.userRepository = userRepository;
         this.workflowMasterRepository = workflowMasterRepository;
         this.workflowStepRepository = workflowStepRepository;
+        this.approvalHistoryRepository = approvalHistoryRepository;
     }
 
     public Request createRequest(
@@ -57,15 +60,20 @@ public class RequestService {
 
         Request requestEntity = new Request();
 
-        requestEntity.setStatus("PENDING");
+        requestEntity.setStatus(RequestStatus.PENDING);
         requestEntity.setCurrentStep(1);
         requestEntity.setCreatedBy(user);
         requestEntity.setWorkflow(workflow);
+        requestEntity.setCreatedAt(
+                LocalDateTime.now());
+        requestEntity.setUpdatedAt(
+                LocalDateTime.now());
 
         return requestRepository.save(requestEntity);
     }
 
-    public Request approveRequest(Long requestId) {
+    public Request approveRequest(Long requestId,
+                                  ActionRequest actionRequest) {
 
         Request request =
                 requestRepository
@@ -73,33 +81,7 @@ public class RequestService {
                         .orElseThrow(() ->
                                 new RuntimeException("Request not found"));
 
-        String email =
-                SecurityContextHolder
-                        .getContext()
-                        .getAuthentication()
-                        .getName();
-
-        User user =
-                userRepository
-                        .findByEmail(email)
-                        .orElseThrow(() ->
-                                new RuntimeException("User not found"));
-
-        WorkflowStep currentWorkflowStep =
-                workflowStepRepository
-                        .findByWorkflowIdAndStepOrder(
-                                request.getWorkflow().getId(),
-                                request.getCurrentStep()
-                        )
-                        .orElseThrow(() ->
-                                new RuntimeException("Workflow step not found"));
-
-        if (!user.getRole().getName().equals(
-                currentWorkflowStep.getRole().getName())) {
-
-            throw new RuntimeException(
-                    "You are not authorized to approve this step");
-        }
+        validateApprovalPermission(request);
 
         Integer nextStep =
                 request.getCurrentStep() + 1;
@@ -117,8 +99,17 @@ public class RequestService {
 
         } else {
 
-            request.setStatus("APPROVED");
+            request.setStatus(RequestStatus.APPROVED);
         }
+
+        saveHistory(
+                request,
+                "APPROVED",
+                actionRequest.getComment()
+        );
+
+        request.setUpdatedAt(
+                LocalDateTime.now());
 
         return requestRepository.save(request);
     }
@@ -172,6 +163,12 @@ public class RequestService {
                 request.getCreatedBy()
                         .getName());
 
+        response.setCreatedAt(
+                request.getCreatedAt());
+
+        response.setUpdatedAt(
+                request.getUpdatedAt());
+
         return response;
     }
 
@@ -208,7 +205,7 @@ public class RequestService {
                                     new RuntimeException(
                                             "Workflow step not found"));
 
-            if ("PENDING".equals(req.getStatus())
+            if (req.getStatus() == RequestStatus.PENDING
                     && currentWorkflowStep.getRole().equals(curRole)) {
 
                 responses.add(
@@ -218,5 +215,142 @@ public class RequestService {
         }
 
         return responses;
+    }
+
+    private void validateApprovalPermission(
+            Request request){
+
+        String email =
+                SecurityContextHolder
+                        .getContext()
+                        .getAuthentication()
+                        .getName();
+
+        User user =
+                userRepository
+                        .findByEmail(email)
+                        .orElseThrow(() ->
+                                new RuntimeException("User not found"));
+
+        WorkflowStep currentWorkflowStep =
+                workflowStepRepository
+                        .findByWorkflowIdAndStepOrder(
+                                request.getWorkflow().getId(),
+                                request.getCurrentStep()
+                        )
+                        .orElseThrow(() ->
+                                new RuntimeException("Workflow step not found"));
+
+        if (!user.getRole().getName().equals(
+                currentWorkflowStep.getRole().getName())) {
+
+            throw new RuntimeException(
+                    "You are not authorized to approve this step");
+        }
+    }
+
+    public Request rejectRequest(Long requestId,
+                                 ActionRequest actionRequest) {
+
+        Request request =
+                requestRepository
+                        .findById(requestId)
+                        .orElseThrow(() ->
+                                new RuntimeException("Request not found"));
+
+        validateApprovalPermission(request);
+
+        request.setStatus(RequestStatus.REJECTED);
+
+        saveHistory(
+                request,
+                "REJECTED",
+                actionRequest.getComment()
+        );
+
+        request.setUpdatedAt(
+                LocalDateTime.now());
+
+        return requestRepository.save(request);
+    }
+
+    private void saveHistory(
+            Request request,
+            String action,
+            String comment) {
+
+        String email =
+                SecurityContextHolder
+                        .getContext()
+                        .getAuthentication()
+                        .getName();
+
+        User user =
+                userRepository
+                        .findByEmail(email)
+                        .orElseThrow(() ->
+                                new RuntimeException("User not found"));
+
+        ApprovalHistory history =
+                new ApprovalHistory();
+
+        history.setRequest(request);
+        history.setStepOrder(
+                request.getCurrentStep()
+        );
+        history.setActionBy(user);
+        history.setComment(comment);
+        history.setAction(action);
+        history.setActionTime(LocalDateTime.now());
+
+        approvalHistoryRepository.save(history);
+    }
+
+    private ApprovalHistoryResponse mapHistory(
+            ApprovalHistory history) {
+
+        ApprovalHistoryResponse response =
+                new ApprovalHistoryResponse();
+
+        response.setAction(
+                history.getAction());
+
+        response.setStepOrder(
+                history.getStepOrder());
+
+        response.setActionBy(
+                history.getActionBy().getName());
+
+        response.setActionTime(
+                history.getActionTime());
+
+        response.setComment(
+                history.getComment());
+
+        return response;
+    }
+
+    public List<ApprovalHistoryResponse>
+    getRequestHistory(Long requestId) {
+
+        return approvalHistoryRepository
+                .findByRequestIdOrderByActionTime(
+                        requestId)
+                .stream()
+                .map(this::mapHistory)
+                .toList();
+    }
+
+    public RequestResponse getRequestById(
+            Long requestId) {
+
+        Request request =
+                requestRepository
+                        .findById(requestId)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Request not found"));
+
+        return mapToResponse(request);
     }
 }
